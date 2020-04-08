@@ -1,0 +1,95 @@
+---
+title: "Practical Machine Learning Final Project"
+author: "Jeff B"
+date: "4/8/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Summary
+
+We trained a Random Forest model to predict how well a weight-lifting exercise was performed, based on data collected by wearables. The model used forty nine predictors. The model was cross-validated using five folds. The accuracy of the model, per a confusion matrix, is 0.9942. The actual performance in the test, per the online quiz, was 100%.
+
+### How you built your model
+
+First we set up the environment. The training and testing sets were already provided, so no data partitioning was necessary. This analysis uses the _caret_ package.
+
+```{r, include=FALSE}
+# Load libraries
+library(tidyverse)
+library(caret)
+```
+```{r}
+
+# Download files
+file1 <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv" # Training data
+file2 <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv" # Testing data
+
+if (!file.exists("pml-training.csv")) {download.file(file1, destfile = "./pml-training.csv")}
+if (!file.exists("pml-testing.csv")) {download.file(file2, destfile = "./pml-testing.csv")}
+
+# Load files into environment
+training <- data.frame(read.csv("pml-training.csv"))
+testing <- data.frame(read.csv("pml-testing.csv"))
+```
+
+The training and testing sets required some tidying. Many variables were removed. Statistical variables, such as averages and standard deviations, were removed so that only the raw underlying measures remained. This also removed all the N/A observations. Variables related to timestamps and rownames were also removed, because they were deemed irrelevant. This reduced the number of variables from 160 to 50.
+
+```{r}
+# Remove summary statistics, timestamps, and windows from data
+omitvars <- grep("avg|max|min|total|var|stddev|skewness|kurtosis|amplitude|timestamp|window",
+     names(training), value = TRUE)
+training <- select(training, !omitvars & !X)
+testing <- select(testing, !omitvars & !X)
+
+# Convert relevant data to numeric class
+training[,2:49] <- sapply(training[,2:49], as.numeric)
+testing[,2:49] <- sapply(testing[,2:49], as.numeric)
+```
+
+Once the data were tidy, we chose to build a random forest model. Code is below.
+
+### How you used cross validation
+
+Basic five-fold cross-validation was used as a training control. Doing dramatically reduced the runtime of the model and allowed us to predict the model's performance despite not having a test set with outcomes listed. 
+
+```{r, cache=TRUE}
+set.seed(1) # Set seed
+
+# Configure resampling, 5-fold cross-validation
+trControl <- trainControl(method = "cv", number = 5, allowParallel = TRUE)
+
+# Run training model
+rf <- train(classe ~ ., method="rf", data=training, trControl=trControl)
+```
+
+### What you think the expected out of sample error is
+
+A confusion matrix estimates accuracy of 0.9942. OOB estimate of error rate is 0.45% We expect the out of sample error to be larger than that of the training model, though not significantly so. We expect the model to predict ~89% of the test cases correctly, calculated as 0.9942^20.
+
+```{r}
+# Assess model
+rf
+rf$resample
+confusionMatrix.train(rf) # 0.9942 accuracy
+```
+
+### Why you made the choices you did
+
+The Random forest model type was chosen due to its reputation for predictive strength. It seemed especially relevant for a multi-factor outcome.
+
+Five-fold cross-validation was used to provide an assessment of predictive performance and to limit the runtime while ensuring all data was used in the training.
+
+No automated preprocessing was used, only the aforementioned manual variable selection and tidying.
+
+### Use your prediction model to predict 20 different test cases.
+
+Predictions based on the testing data are provided below. Real performance was assessed in the online quiz and returned correct predictions for 100% of the test cases.
+
+```{r}
+pred <- predict(rf, testing)
+pred
+```
